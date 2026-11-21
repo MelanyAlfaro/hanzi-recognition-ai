@@ -1,84 +1,198 @@
-"""Generic training loop shared by both approaches.
 
-This file does not know whether it is training the unified network or one
-Binary Relevance classifier. It just trains whatever model it receives.
+"""Generic trainer shared by the Unified and Binary Relevance approaches.
+
+The Trainer is responsible for the complete training process:
+batch preparation, forward passes, loss calculation, backpropagation,
+weight updates, and optional validation.
+
+It does not depend on a specific classification approach. It simply
+trains the model and labels it receives.
 """
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 import config
 
 
-def train_model(model, train_ds, val_ds=None, label_idx=None):
-    """Trains `model` and returns it.
+class Trainer:
+    """Handle the training and validation of neural network models.
 
-    Args:
-        model: a CNN (untrained, random weights).
-        train_ds: dataset whose items are (image, label_vector).
-        val_ds: optional dataset used only to monitor overfitting.
-        label_idx: None  -> use the full label vector (unified approach).
-                   j     -> use only column j (one Binary Relevance classifier).
+    The Trainer can be used with any model compatible with the training
+    process implemented here.
+
+    It supports both classification approaches used in this project:
+
+    - Unified: trains the model using the complete multi-label vector.
+    - Binary Relevance: trains the model using one label at a time.
+
+    Attributes:
+        batch_size (int): Number of images processed in each batch.
+        epochs (int): Number of complete passes through the training dataset.
+        learning_rate (float): Step-size parameter used by the optimizer.
+        device: Device used to perform computations (CPU or GPU).
+        debug (bool): Whether to print additional training information.
     """
-    # Move the network's weights to the GPU (Colab) or leave them on the CPU.
-    model = model.to(config.DEVICE)
 
-    # DataLoader serves the dataset in batches. shuffle=True reorders the
-    # images every epoch so the network does not learn the order.
-    train_loader = DataLoader(train_ds, batch_size=config.BATCH_SIZE, shuffle=True)
-    val_loader = (DataLoader(val_ds, batch_size=config.BATCH_SIZE)
-                  if val_ds is not None else None)
+    def __init__(self) -> None:
+        """Initialize the trainer using the project configuration."""
 
-    # Loss: measures how wrong the predictions are (a single number).
-    # It applies the sigmoid internally, which is why the CNN outputs logits.
-    loss_fn = nn.BCEWithLogitsLoss()
+        self.batch_size = config.BATCH_SIZE
+        self.epochs = config.EPOCHS
+        self.learning_rate = config.LEARNING_RATE
+        self.device = config.DEVICE
+        self.debug = config.DEBUG
+        self.warmup_epochs = config.WARMUP_EPOCHS
+        self.warmup_start_factor = config.WARMUP_START_FACTOR
 
-    # Optimizer: the algorithm that adjusts the weights to reduce the loss.
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
+    def train(
+        self,
+        model: nn.Module,
+        train_ds: Dataset,
+        val_ds: Dataset | None = None,
+        label_idx: int | None = None
+    ) -> nn.Module:
+        """Train a model using the provided training dataset.
 
-    for epoch in range(config.EPOCHS):
+        The label_idx argument determines which target labels are used:
 
-        # ---------------- training pass ----------------
-        model.train()                 # enables Dropout
-        total_loss = 0.0
+        - None: use the complete multi-label vector (Unified).
+        - An integer: use only the corresponding label column
+          (Binary Relevance).
 
-        for x, y in train_loader:     # one batch at a time
-            x, y = x.to(config.DEVICE), y.to(config.DEVICE)
+        Args:
+            model (nn.Module): Neural network to train.
+            train_ds (Dataset): Training dataset containing images and
+                their complete multi-label vectors.
+            val_ds (Dataset | None): Optional validation dataset used
+                to monitor the model's performance during training.
+            label_idx (int | None): Index of the radical to train on.
+                If None, all radical labels are used.
 
-            if label_idx is not None:
-                # Keep only the column of this radical. The slice j:j+1
-                # (instead of j) keeps the shape (batch, 1), matching the
-                # model output.
-                y = y[:, label_idx:label_idx + 1]
+        Returns:
+            nn.Module: The trained model with its updated parameters.
+        """
 
-            optimizer.zero_grad()     # 1. clear gradients from the previous batch
-            logits = model(x)         # 2. forward: images -> scores
-            loss = loss_fn(logits, y) # 3. compare scores with the true labels
-            if config.DEBUG and epoch == 0:
-              print(f"  x{tuple(x.shape)}  y{tuple(y.shape)}  "
-                    f"logits{tuple(logits.shape)}  loss={loss.item():.4f}")
-            loss.backward()           # 4. backward: how much did each weight contribute to the error?
-            optimizer.step()          # 5. adjust the weights a little
+        # Move the model to the selected device (CPU or GPU).
+        model = model.to(self.device)
 
-            total_loss += loss.item() * len(x)   # .item() turns the tensor into a float
+        # Create DataLoaders to provide the data in batches.
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
 
-        train_loss = total_loss / len(train_ds)
+        val_loader = (
+            DataLoader(val_ds, batch_size=self.batch_size)
+            if val_ds is not None else None
+        )
 
-        # ---------------- validation pass ----------------
-        message = f"Epoch {epoch + 1}/{config.EPOCHS}  train_loss={train_loss:.4f}"
+        # Define the loss function and optimizer.
+        loss_fn = nn.BCEWithLogitsLoss()
 
-        if val_loader is not None:
-            model.eval()              # disables Dropout
-            val_loss = 0.0
-            with torch.no_grad():     # no learning here, only measuring
-                for x, y in val_loader:
-                    x, y = x.to(config.DEVICE), y.to(config.DEVICE)
-                    if label_idx is not None:
-                        y = y[:, label_idx:label_idx + 1]
-                    val_loss += loss_fn(model(x), y).item() * len(x)
-            message += f"  val_loss={val_loss / len(val_ds):.4f}"
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=self.learning_rate
+        )
 
-        print(message)
+        # The scheduler changes the optimizer's learning rate over time.
+        # LinearLR grows it linearly from LEARNING_RATE * start_factor up to
+        # LEARNING_RATE during `warmup_epochs` epochs, then keeps it constant.
+        scheduler = None
+        if self.warmup_epochs > 0:
+            scheduler = torch.optim.lr_scheduler.LinearLR(
+                optimizer,
+                start_factor=self.warmup_start_factor,
+                end_factor=1.0,
+                total_iters=self.warmup_epochs
+            )
 
-    return model
+        # Repeat the training process for the configured number of epochs.
+        for epoch in range(self.epochs):
+
+            # ---------------- training pass ----------------
+
+            model.train()
+            total_loss = 0.0
+
+            for images, labels in train_loader:
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+
+                # For Binary Relevance, keep only the target column
+                # corresponding to the radical being trained.
+                if label_idx is not None:
+                    labels = labels[:, label_idx:label_idx + 1]
+
+                # 1. Clear gradients from the previous batch.
+                optimizer.zero_grad()
+
+                # 2. Forward pass: obtain the model's raw output scores.
+                logits = model(images)
+
+                # 3. Calculate the difference between predictions and labels.
+                loss = loss_fn(logits, labels)
+
+                # Print tensor shapes and loss for debugging.
+                if self.debug and epoch == 0:
+                    print(
+                        f"  images{tuple(images.shape)}  "
+                        f"labels{tuple(labels.shape)}  "
+                        f"logits{tuple(logits.shape)}  "
+                        f"loss={loss.item():.4f}"
+                    )
+
+                # 4. Backpropagation: calculate gradients.
+                loss.backward()
+
+                # 5. Update the model's parameters.
+                optimizer.step()
+
+                # Accumulate the loss weighted by the batch size.
+                total_loss += loss.item() * len(images)
+
+            # Calculate the average training loss for this epoch.
+            train_loss = total_loss / len(train_ds)
+
+            # Prepare the epoch summary.
+            message = (
+                f"Epoch {epoch + 1}/{self.epochs}  "
+                f"train_loss={train_loss:.4f}"
+                f"  lr={optimizer.param_groups[0]['lr']:.2e}"
+            )
+
+            # ---------------- validation pass ----------------
+
+            if val_loader is not None:
+                model.eval()
+                val_loss = 0.0
+
+                # Disable gradient calculations during validation.
+                with torch.no_grad():
+                    for images, labels in val_loader:
+                        images = images.to(self.device)
+                        labels = labels.to(self.device)
+
+                        # Apply the same label selection used in training.
+                        if label_idx is not None:
+                            labels = labels[:, label_idx:label_idx + 1]
+
+                        logits = model(images)
+                        loss = loss_fn(logits, labels)
+
+                        val_loss += loss.item() * len(images)
+
+                # Calculate the average validation loss.
+                average_val_loss = val_loss / len(val_ds)
+
+                message += f"  val_loss={average_val_loss:.4f}"
+
+             # Advance the schedule by one epoch
+            if scheduler is not None:
+                scheduler.step()
+
+            print(message)
+
+        return model
