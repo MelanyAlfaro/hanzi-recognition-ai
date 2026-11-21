@@ -35,10 +35,10 @@ IMG_SIZE = 64
 # same seed -> same data split, same initial weights, same results.
 SEED = 42
 
-# Fraction of the data used for each purpose. Must sum to 1.0.
-TRAIN_FRAC = 0.7   # learn from these
-VAL_FRAC = 0.15    # monitor overfitting during training
-TEST_FRAC = 0.15   # final evaluation, only used once at the end
+# Characters assigned to each split (chosen by hand; see the paper's methodology)
+TRAIN_CHARS = ["林", "森", "昌", "晶", "朋", "杳", "棚", "品", "呆", "唱"]
+VAL_CHARS   = ["杲", "呂"]
+TEST_CHARS  = ["明", "杏"]
 
 
 # ----------------------------------------------------------------------
@@ -64,3 +64,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # When True, the trainer prints tensor shapes and loss for every batch of the first epoch.
 DEBUG = True
+
+# Learning-rate warmup: the first epochs use a much smaller learning rate
+WARMUP_EPOCHS = 2            # 0 disables warmup
+WARMUP_START_FACTOR = 1e-3   # first epoch uses LEARNING_RATE * 1e-3
