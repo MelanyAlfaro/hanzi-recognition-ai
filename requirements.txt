@@ -1,0 +1,15 @@
+# Neural network, training loop and tensors
+torch
+
+# Arrays for images and labels
+numpy
+
+# Draws the characters with a font file
+pillow
+
+# F1, Hamming loss and other metrics
+scikit-learn
+
+# Needed from the next steps on (real dataset and figures)
+pandas
+matplotlib
