@@ -16,6 +16,99 @@ import config
 from src.tools.radical_dataset import read_info, read_metadata
 
 
+def assign_splits(
+    root: str | Path,
+    train_chars: Sequence[str],
+    val_chars: Sequence[str],
+    test_chars: Sequence[str],
+    verbose: bool = True,
+) -> pd.DataFrame:
+    """Assign dataset characters to training, validation, and testing.
+
+    All images belonging to the same character are assigned to the same
+    split. Images are not modified, allowing splits to be reassigned
+    without regenerating the dataset.
+
+    Args:
+        root: Directory containing the generated dataset files.
+        train_chars: Characters assigned to training.
+        val_chars: Characters assigned to validation.
+        test_chars: Characters assigned to testing.
+        verbose: Whether to print the number of images and radical
+            occurrences in each split.
+
+    Returns:
+        The updated metadata DataFrame, with its split column assigned.
+        The updated metadata is also saved to metadata.csv.
+
+    Raises:
+        ValueError: If a character appears in multiple splits.
+        ValueError: If a listed character does not exist in the dataset.
+        ValueError: If a dataset character is not assigned to a split.
+        ValueError: If a radical has no examples in the training split.
+        FileNotFoundError: If a required dataset file is missing.
+        OSError: If the updated metadata cannot be saved.
+    """
+    root = Path(root)
+
+    radicals = read_info(root)["radicals"]
+    metadata = read_metadata(root)  # Data for every image
+    labels = np.load(root / config.LABELS_FILE)  # 0/1 label vectors
+
+    character_lists = {
+        "train": train_chars,
+        "val": val_chars,
+        "test": test_chars,
+    }
+
+    mapping = _build_character_mapping(
+        train_chars,
+        val_chars,
+        test_chars,
+    )
+
+    _validate_character_coverage(
+        mapping,
+        set(metadata["character"]),
+    )
+
+    if len(labels) != len(metadata):
+        raise ValueError(
+            f"{config.LABELS_FILE} and {config.META_FILE} have different numbers of rows"
+        )
+
+    # Assign a split to every image based on its character (overwrites).
+    metadata["split"] = metadata["character"].map(mapping)
+
+    for split, characters in character_lists.items():
+        # Mask is a true or false array, 
+        # with True in the positions assigned to the current split
+        # and False in the positions not assigned to the split
+        mask = (metadata["split"] == split).to_numpy()
+
+        # Skip empty split (if there are no Trues in the mask)
+        if not mask.any():
+            continue
+
+        # Use mask to count the number of images containing each radical in a split
+        counts = _count_radicals(labels, mask, radicals)
+
+        if verbose:
+            _print_split_summary(
+                split,
+                characters,
+                int(mask.sum()),
+                counts,
+            )
+
+        # Verify that split has each radical
+        _validate_radical_coverage(counts, split)
+
+    _save_metadata(metadata, root)
+
+    return metadata
+
+
 def _build_character_mapping(
     train_chars: Sequence[str],
     val_chars: Sequence[str],
@@ -180,96 +273,3 @@ def _save_metadata(
 
     metadata.to_csv(temporary_file, index=False)
     temporary_file.replace(root / "metadata.csv")
-
-
-def assign_splits(
-    root: str | Path,
-    train_chars: Sequence[str],
-    val_chars: Sequence[str],
-    test_chars: Sequence[str],
-    verbose: bool = True,
-) -> pd.DataFrame:
-    """Assign dataset characters to training, validation, and testing.
-
-    All images belonging to the same character are assigned to the same
-    split. Images are not modified, allowing splits to be reassigned
-    without regenerating the dataset.
-
-    Args:
-        root: Directory containing the generated dataset files.
-        train_chars: Characters assigned to training.
-        val_chars: Characters assigned to validation.
-        test_chars: Characters assigned to testing.
-        verbose: Whether to print the number of images and radical
-            occurrences in each split.
-
-    Returns:
-        The updated metadata DataFrame, with its split column assigned.
-        The updated metadata is also saved to metadata.csv.
-
-    Raises:
-        ValueError: If a character appears in multiple splits.
-        ValueError: If a listed character does not exist in the dataset.
-        ValueError: If a dataset character is not assigned to a split.
-        ValueError: If a radical has no examples in the training split.
-        FileNotFoundError: If a required dataset file is missing.
-        OSError: If the updated metadata cannot be saved.
-    """
-    root = Path(root)
-
-    radicals = read_info(root)["radicals"]
-    metadata = read_metadata(root)  # Data for every image
-    labels = np.load(root / config.LABELS_FILE)  # 0/1 label vectors
-
-    character_lists = {
-        "train": train_chars,
-        "val": val_chars,
-        "test": test_chars,
-    }
-
-    mapping = _build_character_mapping(
-        train_chars,
-        val_chars,
-        test_chars,
-    )
-
-    _validate_character_coverage(
-        mapping,
-        set(metadata["character"]),
-    )
-
-    if len(labels) != len(metadata):
-        raise ValueError(
-            f"{config.LABELS_FILE} and {config.META_FILE} have different numbers of rows"
-        )
-
-    # Assign a split to every image based on its character (overwrites).
-    metadata["split"] = metadata["character"].map(mapping)
-
-    for split, characters in character_lists.items():
-        # Mask is a true or false array, 
-        # with True in the positions assigned to the current split
-        # and False in the positions not assigned to the split
-        mask = (metadata["split"] == split).to_numpy()
-
-        # Skip empty split (if there are no Trues in the mask)
-        if not mask.any():
-            continue
-
-        # Use mask to count the number of images containing each radical in a split
-        counts = _count_radicals(labels, mask, radicals)
-
-        if verbose:
-            _print_split_summary(
-                split,
-                characters,
-                int(mask.sum()),
-                counts,
-            )
-
-        # Verify that split has each radical
-        _validate_radical_coverage(counts, split)
-
-    _save_metadata(metadata, root)
-
-    return metadata
