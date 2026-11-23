@@ -12,6 +12,7 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
+import config
 from src.tools.radical_dataset import read_info, read_metadata
 
 
@@ -218,7 +219,7 @@ def assign_splits(
 
     radicals = read_info(root)["radicals"]
     metadata = read_metadata(root)  # Data for every image
-    labels = np.load(root / "labels.npy")  # 0/1 label vectors
+    labels = np.load(root / config.LABELS_FILE)  # 0/1 label vectors
 
     character_lists = {
         "train": train_chars,
@@ -239,7 +240,7 @@ def assign_splits(
 
     if len(labels) != len(metadata):
         raise ValueError(
-            "labels.npy and metadata.csv have different numbers of rows"
+            f"{config.LABELS_FILE} and {config.META_FILE} have different numbers of rows"
         )
 
     # Assign a split to every image based on its character (overwrites).

@@ -314,10 +314,10 @@ class DatasetBuilder:
         out_dir = Path(out_dir)
 
         files = {
-            "images": out_dir / "images.npy",
-            "labels": out_dir / "labels.npy",
-            "meta": out_dir / "metadata.csv",
-            "info": out_dir / "generation.json",
+            "images": out_dir / config.IMG_FILE,
+            "labels": out_dir / config.LABELS_FILE,
+            "meta": out_dir / config.META_FILE,
+            "info": out_dir / config.GENERATION_FILE,
         }
 
         if any(p.exists() for p in files.values()):
@@ -469,9 +469,9 @@ class DatasetBuilder:
             "glyph_ratio": self.glyph_ratio,
             "images_per_char": images_per_char,
             "storage": (
-                "images.npy uint8 [N,H,W] ink=255 background=0; "
-                "labels.npy uint8 [N,q]; "
-                "row i of metadata.csv describes image i"
+                f"{config.IMG_FILE} uint8 [N,H,W] ink=255 background=0; "
+                f"{config.LABELS_FILE} uint8 [N,q]; "
+                f"row i of {config.META_FILE} describes image i"
             ),
             "radicals": RADICALS,
             "char_to_radicals": {

@@ -22,6 +22,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+import config
 from src.tools.radicals import RADICALS
 
 SPLITS: tuple[str, ...] = ("train", "val", "test")
@@ -89,8 +90,8 @@ class RadicalDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
     ) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
         """Load metadata, images, and labels from disk."""
         meta = read_metadata(self.root)
-        images = np.load(self.root / "images.npy")
-        labels = np.load(self.root / "labels.npy")
+        images = np.load(self.root / config.IMG_FILE)
+        labels = np.load(self.root / config.LABELS_FILE)
         return meta, images, labels
 
     @staticmethod
@@ -219,7 +220,7 @@ def read_info(root: str | Path) -> dict[str, Any]:
         FileNotFoundError: If ``generation.json`` does not exist.
         ValueError: If the radical order stored on disk differs from ``RADICALS``.
     """
-    path = Path(root) / "generation.json"
+    path = Path(root) / config.GENERATION_FILE
     if not path.exists():
         raise FileNotFoundError(f"{path} is missing; run src/scripts/build_dataset.py")
     info: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
@@ -243,7 +244,7 @@ def read_metadata(root: str | Path) -> pd.DataFrame:
     Raises:
         FileNotFoundError: If ``metadata.csv`` does not exist.
     """
-    path = Path(root) / "metadata.csv"
+    path = Path(root) / config.META_FILE
     if not path.exists():
         raise FileNotFoundError(f"{path} is missing; run src/scripts/build_dataset.py")
     
