@@ -13,3 +13,6 @@ scikit-learn
 # Needed from the next steps on (real dataset and figures)
 pandas
 matplotlib
+
+# Radical generation
+albumentations
