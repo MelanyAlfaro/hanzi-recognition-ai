@@ -49,11 +49,14 @@ def main() -> None:
     if n_fonts < 5:
         print("[warning] 5 or more fonts are recommended (serif and sans)")
 
-    # Generate dataset
-    builder.generate(args.out, images_per_char=args.per_char, overwrite=args.overwrite)
-    
-    # Assign splits according to the config arrays of characters
-    assign_splits(args.out, config.TRAIN_CHARS, config.VAL_CHARS, config.TEST_CHARS)
+    try:
+        # Generate dataset
+        builder.generate(args.out, images_per_char=args.per_char, overwrite=args.overwrite)
+        # Assign splits according to the config arrays of characters
+        assign_splits(args.out, config.TRAIN_CHARS, config.VAL_CHARS, config.TEST_CHARS)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        
 
 
 if __name__ == "__main__":
