@@ -88,7 +88,11 @@ class RadicalDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
     def _load_data(
         self,
     ) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
-        """Load metadata, images, and labels from disk."""
+        """Load metadata, images, and labels from disk.
+        
+        Returns:
+            A tuple with the read metadata, images array, and labels array
+        """
         meta = read_metadata(self.root)
         images = np.load(self.root / config.IMG_FILE)
         labels = np.load(self.root / config.LABELS_FILE)
@@ -100,7 +104,17 @@ class RadicalDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         images: np.ndarray,
         labels: np.ndarray,
     ) -> None:
-        """Validate that all stored arrays have matching lengths."""
+        """Validate that all stored arrays have matching lengths.
+        
+        Args:
+            meta: Metadata of generated images.
+            images: Numpy array of images with shape [N, H, W].
+            labels: Numpy array of the labels with shape [N, q].
+
+        Raises:
+            ValueError: If the three arguments don't have the same length.
+                As this would mean that there is no correspondence between the registers.
+        """
         if not (len(meta) == len(images) == len(labels)):
             raise ValueError(
                 f"metadata ({len(meta)}), images ({len(images)}) and "
@@ -112,7 +126,14 @@ class RadicalDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         split: str | None,
         characters: Sequence[str] | None,
     ) -> None:
-        """Validate mutually exclusive selection arguments."""
+        """Validate mutually exclusive selection arguments.
+        
+        Args:
+            split: One of ``"train"``, ``"val"`` or ``"test"``.
+            
+        Raises:
+            ValueError: If split and characters are both passed (Split is exclusive)
+        """
         if split is not None and characters is not None:
             raise ValueError("Pass split or characters, not both")
 
@@ -123,7 +144,23 @@ class RadicalDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         characters: Sequence[str] | None,
         clean_only: bool,
     ) -> np.ndarray:
-        """Build a boolean mask for the requested dataset selection."""
+        """Build a boolean mask for the requested dataset selection.
+        
+        Args:
+            meta: Metadata of generated images
+            split: One of ``"train"``, ``"val"`` or ``"test"``.
+            characters: Characters to keep. Cannot be combined with ``split``.
+            clean_only: If True, keep only glyphs without augmentation.
+
+        Returns:
+            The created selection mask based on the arguments
+            
+        Raises:
+            ValueError: If the passed split is not one of the three valid ones, or
+                if the split column is empty in the metadata file due to lack of assignments, or
+                if the selected characters are not in the dataset, or
+                if the final selection has no images
+        """
         self._validate_selection(split, characters)
 
         mask = np.ones(len(meta), dtype=bool)
