@@ -22,6 +22,14 @@ FONTS_DIR = ROOT / "data" / "fonts"            # .ttf/.ttc files used to draw ch
 PROCESSED_DIR = ROOT / "data" / "processed"    # generated dataset (images, labels)
 RESULTS_DIR = ROOT / "results"                 # saved metrics, figures
 
+# ----------------------------------------------------------------------
+# Dataset Output file names
+# ----------------------------------------------------------------------
+
+IMG_FILE = "images.npy"
+LABELS_FILE = "labels.npy"
+META_FILE = "metadata.csv"
+GENERATION_FILE = "generation.json"
 
 # ----------------------------------------------------------------------
 # Dataset
