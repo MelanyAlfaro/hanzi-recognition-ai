@@ -21,9 +21,10 @@ import json
 import platform
 import random
 import zlib
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import albumentations as A
 import numpy as np
