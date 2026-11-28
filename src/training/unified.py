@@ -19,9 +19,10 @@ from torch.utils.data import Dataset
 import config
 from src.training.cnn import CNN
 from src.training.trainer import Trainer
+from src.training.classifier import Classifier
 
 
-class UnifiedClassifier:
+class UnifiedClassifier(Classifier):
     """Unified multi-label classifier based on a shared CNN.
 
     The classifier uses one CNN with q output neurons, where q is the

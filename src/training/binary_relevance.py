@@ -21,9 +21,10 @@ from torch.utils.data import Dataset
 import config
 from src.training.cnn import CNN
 from src.training.trainer import Trainer
+from src.training.classifier import Classifier
 
 
-class BinaryRelevanceClassifier:
+class BinaryRelevanceClassifier(Classifier):
     """Binary Relevance classifier composed of independent CNNs.
 
     The classifier creates one CNN per radical. Each network has a single
