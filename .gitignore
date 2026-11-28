@@ -8,6 +8,7 @@ venv/
 data/processed/
 results/*
 !results/README.md
+logs/*
 
 # Environment and editors
 .ipynb_checkpoints/

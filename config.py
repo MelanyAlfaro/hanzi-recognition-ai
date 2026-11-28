@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent
 FONTS_DIR = ROOT / "data" / "fonts"            # .ttf/.ttc files used to draw characters
 PROCESSED_DIR = ROOT / "data" / "processed"    # generated dataset (images, labels)
 RESULTS_DIR = ROOT / "results"                 # saved metrics, figures
+LOGS_DIR = ROOT / "logs"                       # logs for tests
 
 # ----------------------------------------------------------------------
 # Dataset Output file names
