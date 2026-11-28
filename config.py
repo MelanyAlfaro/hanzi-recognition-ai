@@ -76,3 +76,17 @@ DEBUG = True
 # Learning-rate warmup: the first epochs use a much smaller learning rate
 WARMUP_EPOCHS = 2            # 0 disables warmup
 WARMUP_START_FACTOR = 1e-3   # first epoch uses LEARNING_RATE * 1e-3
+
+# Set the seed for everything so it is all the same
+import random
+import numpy as np
+
+
+def apply_seed(seed: int = SEED) -> None:
+  random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+  torch.cuda.manual_seed_all(seed)
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+
+
+apply_seed()
