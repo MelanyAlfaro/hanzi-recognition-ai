@@ -65,7 +65,7 @@ def train_binary(
     train_ds,
     val_ds,
     out_dir,
-    "binary"
+    config.BINARY
   )
 
 
@@ -81,7 +81,7 @@ def train_unified(
     train_ds,
     val_ds,
     out_dir,
-    "unified"
+    config.UNIFIED
   )
 
 
@@ -97,10 +97,12 @@ def train_all(
 
 def main() -> None:
   parser = argparse.ArgumentParser()
-  parser.add_argument("--model", choices=["all", "binary", "unified"], default="all",
+  parser.add_argument("--model", choices=["all", config.BINARY, config.UNIFIED], default="all",
                       help="Type of classifier to train: unified, binary, or all")
   parser.add_argument("--out", type=Path, default=Path(config.RESULTS_DIR),
-                      help="output folder (default: config.PROCESSED_DIR)")
+                      help="output folder (default: config.RESULTS_DIR)")
+  parser.add_argument("--data", type=Path, default=Path(config.PROCESSED_DIR),
+                      help="folder containing the processed data (default: config.PROCESSED_DIR)")
   args = parser.parse_args()
 
   args.out.mkdir(parents=True, exist_ok=True)
@@ -110,8 +112,8 @@ def main() -> None:
   n_labels = train_ds.n_radicals
 
   if args.model == "all": train_all(n_labels, train_ds, val_ds, args.out)
-  elif args.model == "unified": train_unified(n_labels, train_ds, val_ds, args.out)
-  elif args.model == "binary": train_binary(n_labels, train_ds, val_ds, args.out)
+  elif args.model == config.UNIFIED: train_unified(n_labels, train_ds, val_ds, args.out)
+  elif args.model == config.BINARY: train_binary(n_labels, train_ds, val_ds, args.out)
 
 
 if __name__ == "__main__":

@@ -70,6 +70,10 @@ THRESHOLD = 0.5
 # Models and data must be moved to this device with .to(config.DEVICE).
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Name the types of classifiers
+BINARY = "binary"
+UNIFIED = "unified"
+
 # When True, the trainer prints tensor shapes and loss for every batch of the first epoch.
 DEBUG = True
 
